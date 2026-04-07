@@ -9,7 +9,7 @@ data:
     server.port=8078
 
     # Database Configuration (MariaDB)
-    spring.datasource.url=jdbc:mariadb://skala-mariadb:3306/skala
+    spring.datasource.url=jdbc:mariadb://mariadb:3306/skala
     spring.datasource.username=skala
     spring.datasource.driver-class-name=org.mariadb.jdbc.Driver
 
