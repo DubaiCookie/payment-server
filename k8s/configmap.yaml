@@ -47,3 +47,7 @@ data:
 
     # JWT
     jwt.issuer=simple-auth-server
+
+    # Springdoc / Swagger UI
+    springdoc.swagger-ui.config-url=/pay-server/v3/api-docs/swagger-config
+    springdoc.swagger-ui.url=/pay-server/v3/api-docs
