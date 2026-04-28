@@ -10,7 +10,7 @@ on:
 env:
   HARBOR_REGISTRY: amdp-registry.skala-ai.com
   HARBOR_PROJECT: skala26a-cloud
-  IMAGE_NAME: team3-pay-server
+  IMAGE_NAME: team3-payments-server
 
 jobs:
   build-and-push:
@@ -100,7 +100,7 @@ jobs:
         run: |
           IMAGE_TAG="${{ needs.build-and-push.outputs.image_tag }}"
           DIGEST="${{ needs.build-and-push.outputs.image_digest }}"
-          VALUES="chart-repo/charts/pay-server/values.yaml"
+          VALUES="chart-repo/charts/payments-server/values.yaml"
 
           sed -i "s|^\(\s*tag:\s*\).*|\1${IMAGE_TAG}|" "$VALUES"
           sed -i "s|^\(\s*digest:\s*\).*|\1${DIGEST}|" "$VALUES"
@@ -113,8 +113,8 @@ jobs:
           cd chart-repo
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add charts/pay-server/values.yaml
-          git commit -m "chore(pay-server): deploy ${{ needs.build-and-push.outputs.image_tag }}
+          git add charts/payments-server/values.yaml
+          git commit -m "chore(payments-server): deploy ${{ needs.build-and-push.outputs.image_tag }}
 
           digest: ${{ needs.build-and-push.outputs.image_digest }}"
           git push

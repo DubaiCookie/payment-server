@@ -15,7 +15,7 @@ spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MariaDBDialect
 
 # Kafka Configuration
 spring.kafka.bootstrap-servers=localhost:9092
-spring.kafka.consumer.group-id=pay-server-group
+spring.kafka.consumer.group-id=payments-server-group
 spring.kafka.consumer.auto-offset-reset=earliest
 spring.kafka.consumer.key-deserializer=org.apache.kafka.common.serialization.StringDeserializer
 spring.kafka.consumer.value-deserializer=org.apache.kafka.common.serialization.StringDeserializer
@@ -29,7 +29,7 @@ toss.payment.api.secret-key=YOUR_TOSS_SECRET_KEY_HERE
 toss.payment.api.client-key=YOUR_TOSS_CLIENT_KEY_HERE
 
 # Logging
-logging.level.com.payserver=DEBUG
+logging.level.com.paymentsserver=DEBUG
 logging.level.org.springframework.web=INFO
 logging.level.org.hibernate.SQL=DEBUG
 logging.level.org.springframework.kafka=INFO
