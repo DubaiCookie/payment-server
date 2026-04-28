@@ -2,10 +2,14 @@ package com.paymentsserver.controller;
 
 import com.paymentsserver.dto.PaymentConfirmDto;
 import com.paymentsserver.dto.PaymentRequestDto;
+import com.paymentsserver.dto.RefundRequestDto;
 import com.paymentsserver.entity.Payment;
+import com.paymentsserver.entity.Refund;
 import com.paymentsserver.service.PaymentService;
+import com.paymentsserver.service.RefundService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -22,6 +26,7 @@ import java.util.List;
 public class PaymentController {
 
     private final PaymentService paymentService;
+    private final RefundService refundService;
 
     @PostMapping
     @Operation(summary = "결제 준비", description = "새로운 결제를 생성하고 orderId를 반환합니다.")
@@ -76,15 +81,33 @@ public class PaymentController {
         }
     }
 
-    @GetMapping("/user/{userId}")
-    @Operation(summary = "사용자 결제 내역 조회", description = "사용자 ID로 결제 내역을 조회합니다.")
-    public ResponseEntity<List<Payment>> getUserPayments(@PathVariable Long userId) {
+    @GetMapping("/my")
+    @Operation(summary = "내 결제 내역 조회", description = "인증된 사용자의 결제 내역을 조회합니다.")
+    public ResponseEntity<List<Payment>> getMyPayments(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("authenticatedUserId");
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
         try {
             List<Payment> payments = paymentService.getPaymentsByUserId(userId);
             return ResponseEntity.ok(payments);
         } catch (Exception e) {
-            log.error("Failed to get user payments: {}", userId, e);
+            log.error("Failed to get payments for user: {}", userId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @PostMapping("/{paymentId}/refund")
+    @Operation(summary = "결제 환불", description = "결제 ID로 환불을 처리합니다.")
+    public ResponseEntity<Refund> refundPayment(@PathVariable Long paymentId,
+                                                @RequestBody RefundRequestDto request) {
+        request.setPaymentId(paymentId);
+        try {
+            Refund refund = refundService.processRefund(request);
+            return ResponseEntity.status(HttpStatus.CREATED).body(refund);
+        } catch (Exception e) {
+            log.error("Refund failed for paymentId: {}", paymentId, e);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         }
     }
 }
