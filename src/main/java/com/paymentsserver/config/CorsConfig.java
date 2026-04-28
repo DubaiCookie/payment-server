@@ -19,6 +19,9 @@ public class CorsConfig {
     @Value("${cors.payment-server-origin}")
     private String payServerOrigin;
 
+    @Value("${cors.ingress-origin:http://localhost:8080}")
+    private String corsIngressOrigin;
+
     @Bean
     public CorsFilter corsFilter() {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
@@ -33,6 +36,7 @@ public class CorsConfig {
         config.addAllowedOrigin(payServerOrigin); // 배포 pay-server (HTML 페이지)
         config.addAllowedOrigin(serverOrigin); // https://baeminjun.store
         config.addAllowedOrigin(serverOriginSwagger);
+        config.addAllowedOrigin(corsIngressOrigin);
 
         config.addAllowedHeader("*"); // 모든 헤더 허용
         config.addAllowedMethod("*"); // 모든 HTTP 메서드 허용 (GET, POST, PUT, DELETE 등)
