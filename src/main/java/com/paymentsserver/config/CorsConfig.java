@@ -16,7 +16,7 @@ public class CorsConfig {
     @Value("${cors.server-origin-swagger}")
     private String serverOriginSwagger;
 
-    @Value("${cors.payments-server-origin}")
+    @Value("${cors.payment-server-origin}")
     private String payServerOrigin;
 
     @Bean

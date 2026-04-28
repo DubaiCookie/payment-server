@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 env:
-  IMAGE_NAME: amdp-registry.skala-ai.com/skala26a-cloud/team3-payments-server
+  IMAGE_NAME: amdp-registry.skala-ai.com/skala26a-cloud/team3-payment-server
 
 jobs:
   build-and-push:
