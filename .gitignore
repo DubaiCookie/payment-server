@@ -41,11 +41,6 @@ out/
 .env.local
 .env.*.local
 
-### Application Properties ###
-application.properties
-application-*.properties
-src/main/resources/application.properties
-src/main/resources/application-*.properties
 
 ### K8s Secrets ###
 k8s/secret.yaml
