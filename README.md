@@ -54,7 +54,7 @@ Toss Payment API를 활용한 결제 및 환불 서비스
 
 서버 실행 후 다음 URL에서 API 문서 확인:
 ```
-http://localhost:8080/swagger-ui/index.html
+https://skala3-cloud1-team3.cloud.skala-ai.com/payment-server/swagger-ui/index.html
 ```
 
 ## 설정
