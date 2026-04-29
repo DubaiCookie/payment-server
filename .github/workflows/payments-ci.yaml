@@ -62,3 +62,20 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: 09. 오래된 이미지 정리 (최근 5개 유지)
+        if: github.event_name == 'push'
+        run: |
+          HARBOR_URL="https://amdp-registry.skala-ai.com"
+          PROJECT="skala26a-cloud"
+          REPO="team3-payment-server"
+
+          ARTIFACTS=$(curl -s -u "${{ secrets.HARBOR_USERNAME }}:${{ secrets.HARBOR_PASSWORD }}" \
+            "${HARBOR_URL}/api/v2.0/projects/${PROJECT}/repositories/${REPO}/artifacts?sort=-push_time&page_size=100")
+
+          echo "$ARTIFACTS" | jq -r '.[5:] | .[].digest' | while read -r DIGEST; do
+            echo "오래된 이미지 삭제: ${DIGEST}"
+            curl -s -X DELETE -u "${{ secrets.HARBOR_USERNAME }}:${{ secrets.HARBOR_PASSWORD }}" \
+              "${HARBOR_URL}/api/v2.0/projects/${PROJECT}/repositories/${REPO}/artifacts/${DIGEST}" \
+              && echo "삭제 완료: ${DIGEST}" || echo "삭제 실패: ${DIGEST}"
+          done
+

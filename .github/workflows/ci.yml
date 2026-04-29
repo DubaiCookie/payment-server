@@ -82,6 +82,19 @@ jobs:
           echo "- Tag: \`${{ steps.vars.outputs.image_versioned }}\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- Digest: \`${{ steps.build.outputs.digest }}\`" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Cleanup old images (keep last 5)
+        run: |
+          HARBOR_URL="https://${{ env.HARBOR_REGISTRY }}"
+          ARTIFACTS=$(curl -s -u "${{ secrets.HARBOR_USERNAME }}:${{ secrets.HARBOR_PASSWORD }}" \
+            "${HARBOR_URL}/api/v2.0/projects/${{ env.HARBOR_PROJECT }}/repositories/${{ env.IMAGE_NAME }}/artifacts?sort=-push_time&page_size=100")
+
+          echo "$ARTIFACTS" | jq -r '.[5:] | .[].digest' | while read -r DIGEST; do
+            echo "Deleting old artifact: ${DIGEST}"
+            curl -s -X DELETE -u "${{ secrets.HARBOR_USERNAME }}:${{ secrets.HARBOR_PASSWORD }}" \
+              "${HARBOR_URL}/api/v2.0/projects/${{ env.HARBOR_PROJECT }}/repositories/${{ env.IMAGE_NAME }}/artifacts/${DIGEST}" \
+              && echo "Deleted: ${DIGEST}" || echo "Failed to delete: ${DIGEST}"
+          done
+
   update-chart:
     name: Update Helm chart values
     needs: build-and-push
