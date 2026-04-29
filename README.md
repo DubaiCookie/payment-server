@@ -54,7 +54,7 @@ Toss Payment API를 활용한 결제 및 환불 서비스
 
 서버 실행 후 다음 URL에서 API 문서 확인:
 ```
-http://localhost:8082/swagger-ui/index.html
+http://localhost:8080/swagger-ui/index.html
 ```
 
 ## 설정
@@ -71,7 +71,7 @@ cp src/main/resources/application.properties.example src/main/resources/applicat
 2. `application.properties` 파일을 열어 실제 값으로 변경:
 ```properties
 # 서버 포트
-server.port=8082
+server.port=8080
 
 # 데이터베이스 설정
 spring.datasource.url=jdbc:mariadb://localhost:3379/sql_db
