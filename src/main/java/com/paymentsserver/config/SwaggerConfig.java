@@ -23,8 +23,7 @@ public class SwaggerConfig {
                         .description("Toss Payment 기반 결제/환불 서비스 REST API 문서")
                         .version("v1.0.0"))
                 .servers(List.of(
-                        new Server().url("/").description("Current Server"),
-                        new Server().url(serverOrigin).description("Production Server")
+                        new Server().url("/").description("Current Server")
                 ));
 
         return openAPI;
