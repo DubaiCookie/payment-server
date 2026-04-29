@@ -30,9 +30,14 @@ public class PaymentController {
 
     @PostMapping
     @Operation(summary = "결제 준비", description = "새로운 결제를 생성하고 orderId를 반환합니다.")
-    public ResponseEntity<Payment> createPayment(@RequestBody PaymentRequestDto request) {
+    public ResponseEntity<Payment> createPayment(@RequestBody PaymentRequestDto request,
+                                                 HttpServletRequest httpRequest) {
+        Long userId = (Long) httpRequest.getAttribute("authenticatedUserId");
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
         try {
-            Payment payment = paymentService.createPayment(request);
+            Payment payment = paymentService.createPayment(request, userId);
             return ResponseEntity.status(HttpStatus.CREATED).body(payment);
         } catch (Exception e) {
             log.error("Payment creation failed", e);
@@ -100,10 +105,15 @@ public class PaymentController {
     @PostMapping("/{paymentId}/refund")
     @Operation(summary = "결제 환불", description = "결제 ID로 환불을 처리합니다.")
     public ResponseEntity<Refund> refundPayment(@PathVariable Long paymentId,
-                                                @RequestBody RefundRequestDto request) {
+                                                @RequestBody RefundRequestDto request,
+                                                HttpServletRequest httpRequest) {
+        Long userId = (Long) httpRequest.getAttribute("authenticatedUserId");
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
         request.setPaymentId(paymentId);
         try {
-            Refund refund = refundService.processRefund(request);
+            Refund refund = refundService.processRefund(request, userId);
             return ResponseEntity.status(HttpStatus.CREATED).body(refund);
         } catch (Exception e) {
             log.error("Refund failed for paymentId: {}", paymentId, e);

@@ -44,10 +44,15 @@ public class RefundService {
      * 3) Kafka refund-events 토픽으로 환불 완료 이벤트 발행
      */
     @Transactional
-    public Refund processRefund(RefundRequestDto request) {
+    public Refund processRefund(RefundRequestDto request, Long requesterId) {
         // 멱등성 체크: 비관적 락으로 결제 조회
         Payment payment = paymentRepository.findByIdWithLock(request.getPaymentId())
                 .orElseThrow(() -> new RuntimeException("Payment not found: " + request.getPaymentId()));
+
+        // 소유권 검증: 요청자가 해당 결제의 소유자인지 확인
+        if (!payment.getUserId().equals(requesterId)) {
+            throw new RuntimeException("Access denied: not your payment");
+        }
 
         // 이미 취소된 결제 → 기존 완료된 환불 반환 (중복 요청 방어)
         if (payment.getPaymentStatus() == PaymentStatus.CANCELLED) {

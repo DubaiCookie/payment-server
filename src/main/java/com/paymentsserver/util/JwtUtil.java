@@ -14,10 +14,10 @@ import com.paymentsserver.exception.ExpiredTokenException;
 @Component
 public class JwtUtil {
 
-    @Value("${jwt.secret:RANDOM_SECRET_KEY}")
+    @Value("${jwt.secret:LOCAL_DEV_SECRET_KEY_CHANGE_ME}")
     private String secret;
 
-    @Value("${jwt.issuer:simple-auth-server}")
+    @Value("${jwt.issuer:user-server}")
     private String issuer;
 
     /**

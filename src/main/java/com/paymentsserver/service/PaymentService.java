@@ -32,7 +32,7 @@ public class PaymentService {
      * 결제 준비 (Order 생성 후 Payment 생성)
      */
     @Transactional
-    public Payment createPayment(PaymentRequestDto request) {
+    public Payment createPayment(PaymentRequestDto request, Long userId) {
         int quantity = request.getTicketQuantity() != null ? request.getTicketQuantity() : 1;
 
         // 1. ticketType으로 Ticket 조회 → price 확인
@@ -50,9 +50,9 @@ public class PaymentService {
         long amount = (long) ticket.getPrice() * quantity;
         String orderName = request.getTicketType().name() + " 티켓 " + quantity + "매";
 
-        // 4. Order 생성
+        // 4. Order 생성 (userId는 JWT에서 추출한 값 사용)
         Order order = Order.builder()
-                .userId(request.getUserId())
+                .userId(userId)
                 .orderName(orderName)
                 .totalAmount(amount)
                 .ticketQuantity(quantity)
@@ -62,11 +62,11 @@ public class PaymentService {
 
         Order savedOrder = orderRepository.save(order);
         log.info("Order created: orderId={}, userId={}, amount={}, ticketManagementId={}",
-                savedOrder.getOrderId(), request.getUserId(), amount, ticketManagement.getTicketManagementId());
+                savedOrder.getOrderId(), userId, amount, ticketManagement.getTicketManagementId());
 
         // 5. Payment 생성
         Payment payment = Payment.builder()
-                .userId(request.getUserId())
+                .userId(userId)
                 .orderId(savedOrder.getOrderId())
                 .orderName(orderName)
                 .amount(amount)
@@ -75,7 +75,7 @@ public class PaymentService {
 
         Payment savedPayment = paymentRepository.save(payment);
         log.info("Payment created: paymentId={}, orderId={}, userId={}, amount={}",
-                savedPayment.getPaymentId(), savedOrder.getOrderId(), request.getUserId(), amount);
+                savedPayment.getPaymentId(), savedOrder.getOrderId(), userId, amount);
 
         return savedPayment;
     }
