@@ -19,6 +19,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         if ("OPTIONS".equalsIgnoreCase(method)) return true;
         if (path.startsWith("/swagger-ui") || path.startsWith("/v3/api-docs")) return true;
+        // Toss 결제 승인 콜백은 사용자 세션이 끊긴 상태(토큰 만료, 다른 탭 등)에서도
+        // orderId 기반으로 처리되어야 하므로 인증을 요구하지 않는다.
+        if ("POST".equalsIgnoreCase(method) && path.endsWith("/payments/confirm")) return true;
 
         return false;
     }

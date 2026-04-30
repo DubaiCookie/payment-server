@@ -79,14 +79,27 @@ public class PaymentService {
         Payment existingPayment = paymentRepository.findByOrderIdWithLock(confirmDto.getOrderId())
                 .orElseThrow(() -> new PaymentException("PAYMENT_NOT_FOUND", "존재하지 않는 결제입니다."));
 
+        // Toss 콜백/페이지 새로고침으로 동일한 confirm 요청이 재진입할 수 있다.
+        // 같은 paymentKey 로 이미 완료된 결제는 멱등하게 동일 응답을 돌려준다.
         if (existingPayment.getPaymentStatus() == PaymentStatus.COMPLETED) {
+            if (existingPayment.getPaymentKey() != null
+                    && existingPayment.getPaymentKey().equals(confirmDto.getPaymentKey())) {
+                return PaymentConfirmResponseDto.builder()
+                        .paymentId(existingPayment.getPaymentId())
+                        .paymentKey(existingPayment.getPaymentKey())
+                        .paymentMethod(existingPayment.getPaymentMethod())
+                        .paymentStatus(existingPayment.getPaymentStatus())
+                        .paidAt(existingPayment.getPaidAt())
+                        .build();
+            }
             throw new PaymentException("PAYMENT_ALREADY_COMPLETED", "이미 완료된 결제입니다.");
         }
         if (existingPayment.getPaymentStatus() == PaymentStatus.FAILED) {
             throw new PaymentException("PAYMENT_ALREADY_FAILED", "이미 실패한 결제입니다.");
         }
 
-        if (!existingPayment.getAmount().equals(confirmDto.getAmount())) {
+        if (existingPayment.getAmount() == null
+                || !existingPayment.getAmount().equals(confirmDto.getAmount())) {
             throw new PaymentException("AMOUNT_MISMATCH", "결제 금액이 주문 금액과 일치하지 않습니다.");
         }
 
