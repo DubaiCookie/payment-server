@@ -31,6 +31,11 @@ public class KafkaConfig {
         configProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         configProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         configProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        // 브로커 장애 시 send() 가 60초(default)간 블로킹되어 HTTP 요청 스레드가
+        // 같이 멈추는 사고를 막기 위해 fail-fast 설정.
+        configProps.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, 3_000);
+        configProps.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, 5_000);
+        configProps.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, 10_000);
         return new DefaultKafkaProducerFactory<>(configProps);
     }
 
