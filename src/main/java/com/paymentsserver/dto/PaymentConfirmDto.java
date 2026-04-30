@@ -1,5 +1,6 @@
 package com.paymentsserver.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -10,6 +11,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class PaymentConfirmDto {
     @Schema(description = "Toss에서 반환한 결제 키", example = "tviva20240129160248vnGbK")
     private String paymentKey;
