@@ -29,8 +29,15 @@ public class Payment {
     @Column(name = "order_id", nullable = false)
     private Long orderId;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "order_type", nullable = false)
+    private OrderType orderType;
+
     @Column(name = "order_name", nullable = false)
     private String orderName;
+
+    @Column(name = "toss_order_id", unique = true)
+    private String tossOrderId;
 
     @Column(name = "amount", nullable = false)
     private Long amount;
@@ -44,6 +51,9 @@ public class Payment {
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_status", nullable = false)
     private PaymentStatus paymentStatus;
+
+    @Column(name = "paid_at")
+    private LocalDateTime paidAt;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;

@@ -1,4 +1,4 @@
-name: CI - Build & Push to AWS ECR
+name: CI - Build & Push to ECR
 
 on:
   push:
@@ -8,10 +8,8 @@ on:
   workflow_dispatch:
 
 env:
-  AWS_ACCOUNT_ID: 881490135253
   AWS_REGION: ap-northeast-2
-  ECR_REPOSITORY: skala3-cloud1-team3-payment-server
-  IMAGE_NAME: team3-payment-server
+  ECR_REPO: skala3-cloud1-team3-payment-server
 
 jobs:
   build-and-push:
@@ -38,6 +36,24 @@ jobs:
       - name: Build bootJar
         run: ./gradlew clean bootJar -x test --no-daemon
 
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: ECR 리포지토리 생성 (없으면)
+        run: |
+          aws ecr describe-repositories --repository-names $ECR_REPO --region $AWS_REGION \
+            >/dev/null 2>&1 || \
+          aws ecr create-repository --repository-name $ECR_REPO --region $AWS_REGION \
+            --image-scanning-configuration scanOnPush=true
+
       - name: Resolve image tag
         id: vars
         run: |
@@ -47,8 +63,7 @@ jobs:
           else
             IMAGE_TAG="${GITHUB_REF_NAME}-${SHORT_SHA}"
           fi
-          ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
-          IMAGE_BASE="${ECR_REGISTRY}/${ECR_REPOSITORY}"
+          IMAGE_BASE="${{ steps.login-ecr.outputs.registry }}/${ECR_REPO}"
           echo "image_tag=${IMAGE_TAG}"                          >> "$GITHUB_OUTPUT"
           echo "image_base=${IMAGE_BASE}"                        >> "$GITHUB_OUTPUT"
           echo "image_versioned=${IMAGE_BASE}:${IMAGE_TAG}"      >> "$GITHUB_OUTPUT"
@@ -56,17 +71,6 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Log in to AWS ECR
-        uses: aws-actions/amazon-ecr-login@v2
-        id: login-ecr
 
       - name: Build and push Docker image
         id: build
@@ -87,19 +91,6 @@ jobs:
           echo "### Image pushed" >> "$GITHUB_STEP_SUMMARY"
           echo "- Tag: \`${{ steps.vars.outputs.image_versioned }}\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- Digest: \`${{ steps.build.outputs.digest }}\`" >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Cleanup old images (keep last 5)
-        run: |
-          HARBOR_URL="https://${{ env.HARBOR_REGISTRY }}"
-          ARTIFACTS=$(curl -s -u "${{ secrets.HARBOR_USERNAME }}:${{ secrets.HARBOR_PASSWORD }}" \
-            "${HARBOR_URL}/api/v2.0/projects/${{ env.HARBOR_PROJECT }}/repositories/${{ env.IMAGE_NAME }}/artifacts?sort=-push_time&page_size=100")
-
-          echo "$ARTIFACTS" | jq -r '.[5:] | .[].digest' | while read -r DIGEST; do
-            echo "Deleting old artifact: ${DIGEST}"
-            curl -s -X DELETE -u "${{ secrets.HARBOR_USERNAME }}:${{ secrets.HARBOR_PASSWORD }}" \
-              "${HARBOR_URL}/api/v2.0/projects/${{ env.HARBOR_PROJECT }}/repositories/${{ env.IMAGE_NAME }}/artifacts/${DIGEST}" \
-              && echo "Deleted: ${DIGEST}" || echo "Failed to delete: ${DIGEST}"
-          done
 
   update-chart:
     name: Update Helm chart values

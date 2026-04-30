@@ -3,11 +3,9 @@ package com.paymentsserver.service;
 import com.paymentsserver.client.TossPaymentClient;
 import com.paymentsserver.dto.*;
 import com.paymentsserver.entity.*;
+import com.paymentsserver.exception.PaymentException;
 import com.paymentsserver.kafka.KafkaProducer;
-import com.paymentsserver.repository.OrderRepository;
 import com.paymentsserver.repository.PaymentRepository;
-import com.paymentsserver.repository.TicketManagementRepository;
-import com.paymentsserver.repository.TicketRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -15,6 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -22,174 +22,143 @@ import java.util.List;
 public class PaymentService {
 
     private final PaymentRepository paymentRepository;
-    private final OrderRepository orderRepository;
-    private final TicketRepository ticketRepository;
-    private final TicketManagementRepository ticketManagementRepository;
     private final TossPaymentClient tossPaymentClient;
     private final KafkaProducer kafkaProducer;
 
-    /**
-     * 결제 준비 (Order 생성 후 Payment 생성)
-     */
     @Transactional
-    public Payment createPayment(PaymentRequestDto request) {
-        int quantity = request.getTicketQuantity() != null ? request.getTicketQuantity() : 1;
+    public PaymentCreateResponseDto createPayment(PaymentRequestDto request, Long userId) {
+        if (request.getOrderId() == null || request.getOrderType() == null
+                || request.getOrderName() == null || request.getOrderName().isBlank()) {
+            throw new PaymentException("MISSING_REQUIRED_FIELD", "필수 입력값이 누락되었습니다.");
+        }
+        if (request.getAmount() == null || request.getAmount() <= 0) {
+            throw new PaymentException("INVALID_AMOUNT", "금액은 0보다 커야 합니다.");
+        }
 
-        // 1. ticketType으로 Ticket 조회 → price 확인
-        Ticket ticket = ticketRepository.findByTicketType(request.getTicketType())
-                .orElseThrow(() -> new RuntimeException("Ticket not found: " + request.getTicketType()));
+        paymentRepository.findByOrderId(request.getOrderId()).ifPresent(existing -> {
+            if (existing.getPaymentStatus() == PaymentStatus.CANCELLED) {
+                throw new PaymentException("ORDER_ALREADY_CANCELLED", "취소된 주문입니다.");
+            }
+            if (existing.getPaymentStatus() != PaymentStatus.FAILED) {
+                throw new PaymentException("PAYMENT_ALREADY_EXISTS", "이미 결제가 진행 중인 주문입니다.");
+            }
+        });
 
-        // 2. ticketId + availableDate로 TicketManagement 조회
-        LocalDateTime startOfDay = request.getAvailableDate().atStartOfDay();
-        LocalDateTime endOfDay = request.getAvailableDate().atTime(23, 59, 59);
-        TicketManagement ticketManagement = ticketManagementRepository
-                .findByTicketIdAndAvailableAtBetween(ticket.getTicketId(), startOfDay, endOfDay)
-                .orElseThrow(() -> new RuntimeException("TicketManagement not found for date: " + request.getAvailableDate()));
+        String tossOrderId = "ORDER-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16).toUpperCase();
 
-        // 3. amount 서버에서 계산
-        long amount = (long) ticket.getPrice() * quantity;
-        String orderName = request.getTicketType().name() + " 티켓 " + quantity + "매";
-
-        // 4. Order 생성
-        Order order = Order.builder()
-                .userId(request.getUserId())
-                .orderName(orderName)
-                .totalAmount(amount)
-                .ticketQuantity(quantity)
-                .ticketManagementId(ticketManagement.getTicketManagementId())
-                .orderStatus(OrderStatus.PENDING)
-                .build();
-
-        Order savedOrder = orderRepository.save(order);
-        log.info("Order created: orderId={}, userId={}, amount={}, ticketManagementId={}",
-                savedOrder.getOrderId(), request.getUserId(), amount, ticketManagement.getTicketManagementId());
-
-        // 5. Payment 생성
         Payment payment = Payment.builder()
-                .userId(request.getUserId())
-                .orderId(savedOrder.getOrderId())
-                .orderName(orderName)
-                .amount(amount)
+                .userId(userId)
+                .orderId(request.getOrderId())
+                .orderType(request.getOrderType())
+                .orderName(request.getOrderName())
+                .amount(request.getAmount())
+                .tossOrderId(tossOrderId)
                 .paymentStatus(PaymentStatus.PENDING)
                 .build();
 
-        Payment savedPayment = paymentRepository.save(payment);
+        Payment saved = paymentRepository.save(payment);
         log.info("Payment created: paymentId={}, orderId={}, userId={}, amount={}",
-                savedPayment.getPaymentId(), savedOrder.getOrderId(), request.getUserId(), amount);
+                saved.getPaymentId(), saved.getOrderId(), userId, saved.getAmount());
 
-        return savedPayment;
+        return PaymentCreateResponseDto.builder()
+                .paymentId(saved.getPaymentId())
+                .orderId(saved.getOrderId())
+                .orderType(saved.getOrderType())
+                .amount(saved.getAmount())
+                .paymentStatus(saved.getPaymentStatus())
+                .build();
     }
 
-    /**
-     * 결제 승인 (Toss Payment API 호출)
-     */
     @Transactional
-    public Payment confirmPayment(PaymentConfirmDto confirmDto) {
-        // 멱등성 체크: 비관적 락으로 조회 후 이미 처리된 결제는 즉시 반환
+    public PaymentConfirmResponseDto confirmPayment(PaymentConfirmDto confirmDto) {
+        if (confirmDto.getPaymentKey() == null || confirmDto.getOrderId() == null || confirmDto.getAmount() == null) {
+            throw new PaymentException("MISSING_REQUIRED_FIELD", "필수 입력값이 누락되었습니다.");
+        }
+
         Payment existingPayment = paymentRepository.findByOrderIdWithLock(confirmDto.getOrderId())
-                .orElseThrow(() -> new RuntimeException("Payment not found: " + confirmDto.getOrderId()));
+                .orElseThrow(() -> new PaymentException("PAYMENT_NOT_FOUND", "존재하지 않는 결제입니다."));
 
         if (existingPayment.getPaymentStatus() == PaymentStatus.COMPLETED) {
-            log.info("Payment already completed (idempotent): orderId={}", confirmDto.getOrderId());
-            return existingPayment;
+            throw new PaymentException("PAYMENT_ALREADY_COMPLETED", "이미 완료된 결제입니다.");
         }
         if (existingPayment.getPaymentStatus() == PaymentStatus.FAILED) {
-            throw new RuntimeException("Payment already failed: " + confirmDto.getOrderId());
+            throw new PaymentException("PAYMENT_ALREADY_FAILED", "이미 실패한 결제입니다.");
+        }
+
+        if (!existingPayment.getAmount().equals(confirmDto.getAmount())) {
+            throw new PaymentException("AMOUNT_MISMATCH", "결제 금액이 주문 금액과 일치하지 않습니다.");
         }
 
         try {
-            log.info("Confirming payment - orderId: {}, tossOrderId: {}, paymentKey: {}, amount: {}",
-                    confirmDto.getOrderId(), confirmDto.getTossOrderId(),
-                    confirmDto.getPaymentKey(), confirmDto.getAmount());
-
-            // Toss Payment API 호출 (Toss는 원래 보낸 orderId 형식을 받음)
             TossPaymentConfirmRequest tossRequest = TossPaymentConfirmRequest.builder()
                     .paymentKey(confirmDto.getPaymentKey())
-                    .orderId(confirmDto.getTossOrderId())  // Toss에 보낸 원본 orderId 사용
+                    .orderId(existingPayment.getTossOrderId())
                     .amount(confirmDto.getAmount())
                     .build();
 
-            log.info("Sending to Toss API - request: paymentKey={}, orderId={}, amount={}",
-                    tossRequest.getPaymentKey(), tossRequest.getOrderId(), tossRequest.getAmount());
-
             TossPaymentResponse tossResponse = tossPaymentClient.confirmPayment(tossRequest);
 
-            // DB 업데이트 (이미 락으로 조회한 existingPayment 재사용)
+            LocalDateTime paidAt = LocalDateTime.now();
             existingPayment.setPaymentKey(tossResponse.getPaymentKey());
             existingPayment.setPaymentMethod(tossResponse.getMethod());
             existingPayment.setPaymentStatus(PaymentStatus.COMPLETED);
+            existingPayment.setPaidAt(paidAt);
+            paymentRepository.save(existingPayment);
 
-            Payment updatedPayment = paymentRepository.save(existingPayment);
+            log.info("Payment confirmed: paymentId={}, orderId={}", existingPayment.getPaymentId(), confirmDto.getOrderId());
 
-            // Order 상태 업데이트
-            Order order = orderRepository.findById(existingPayment.getOrderId())
-                    .orElseThrow(() -> new RuntimeException("Order not found: " + existingPayment.getOrderId()));
-            order.setOrderStatus(OrderStatus.PAID);
-            orderRepository.save(order);
-
-            // 재고 차감
-            TicketManagement ticketManagement = ticketManagementRepository.findByIdWithLock(order.getTicketManagementId())
-                    .orElseThrow(() -> new RuntimeException("TicketManagement not found: " + order.getTicketManagementId()));
-            ticketManagement.reduceStock(order.getTicketQuantity());
-            ticketManagementRepository.save(ticketManagement);
-
-            log.info("Stock reduced: ticketManagementId={}, quantity={}, remainingStock={}",
-                    order.getTicketManagementId(), order.getTicketQuantity(), ticketManagement.getStock());
-
-            log.info("Payment confirmed: paymentKey={}, orderId={}",
-                    tossResponse.getPaymentKey(), confirmDto.getOrderId());
-
-            // Kafka 이벤트 전송
             kafkaProducer.sendPaymentCompletedEvent(
                     existingPayment.getUserId(),
                     existingPayment.getPaymentId(),
                     existingPayment.getOrderId(),
                     existingPayment.getAmount(),
-                    order.getTicketManagementId()
+                    null
             );
 
-            return updatedPayment;
+            return PaymentConfirmResponseDto.builder()
+                    .paymentId(existingPayment.getPaymentId())
+                    .paymentKey(tossResponse.getPaymentKey())
+                    .paymentMethod(tossResponse.getMethod())
+                    .paymentStatus(PaymentStatus.COMPLETED)
+                    .paidAt(paidAt)
+                    .build();
 
+        } catch (PaymentException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Payment confirmation failed: orderId={}", confirmDto.getOrderId(), e);
-
-            // 결제 실패 처리 (이미 락으로 조회한 existingPayment 재사용)
             existingPayment.setPaymentStatus(PaymentStatus.FAILED);
             paymentRepository.save(existingPayment);
-
-            // Order 상태도 업데이트
-            Order order = orderRepository.findById(existingPayment.getOrderId())
-                    .orElseThrow(() -> new RuntimeException("Order not found"));
-            order.setOrderStatus(OrderStatus.CANCELLED);
-            orderRepository.save(order);
-
-            throw new RuntimeException(e.getMessage() == null ? "Payment confirmation failed" : e.getMessage(), e);
+            throw new PaymentException("PAYMENT_CONFIRM_FAILED",
+                    e.getMessage() == null ? "결제 승인에 실패했습니다." : e.getMessage());
         }
     }
 
-    /**
-     * 결제 조회 (orderId로)
-     */
     @Transactional(readOnly = true)
     public Payment getPaymentByOrderId(Long orderId) {
         return paymentRepository.findByOrderId(orderId)
-                .orElseThrow(() -> new RuntimeException("Payment not found: " + orderId));
+                .orElseThrow(() -> new PaymentException("PAYMENT_NOT_FOUND", "존재하지 않는 결제입니다."));
     }
 
-    /**
-     * 결제 조회 (paymentId로)
-     */
     @Transactional(readOnly = true)
     public Payment getPaymentById(Long paymentId) {
         return paymentRepository.findById(paymentId)
-                .orElseThrow(() -> new RuntimeException("Payment not found: " + paymentId));
+                .orElseThrow(() -> new PaymentException("PAYMENT_NOT_FOUND", "존재하지 않는 결제입니다."));
     }
 
-    /**
-     * 사용자별 결제 내역 조회
-     */
     @Transactional(readOnly = true)
-    public List<Payment> getPaymentsByUserId(Long userId) {
-        return paymentRepository.findByUserId(userId);
+    public List<PaymentMyResponseDto> getPaymentsByUserId(Long userId) {
+        return paymentRepository.findByUserId(userId).stream()
+                .map(p -> PaymentMyResponseDto.builder()
+                        .paymentId(p.getPaymentId())
+                        .orderId(p.getOrderId())
+                        .orderType(p.getOrderType())
+                        .orderName(p.getOrderName())
+                        .amount(p.getAmount())
+                        .paymentMethod(p.getPaymentMethod())
+                        .paymentStatus(p.getPaymentStatus())
+                        .paidAt(p.getPaidAt())
+                        .build())
+                .collect(Collectors.toList());
     }
 }

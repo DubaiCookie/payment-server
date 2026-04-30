@@ -1,5 +1,6 @@
 package com.paymentsserver.dto;
 
+import com.paymentsserver.entity.RefundStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -9,8 +10,9 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class RefundRequestDto {
+public class RefundResponseDto {
+    private Long refundId;
     private Long paymentId;
     private Long refundAmount;
-    private String reason;
+    private RefundStatus refundStatus;
 }

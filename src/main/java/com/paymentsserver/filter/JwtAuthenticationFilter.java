@@ -62,13 +62,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             // 2. JWT 토큰 검증
             jwtUtil.validateToken(accessToken);
 
-            // 3. 토큰에서 사용자 ID 추출
+            // 3. Access Token 타입 검증
+            String tokenType = jwtUtil.getTokenType(accessToken);
+            if (!"access".equals(tokenType)) {
+                sendUnauthorizedResponse(response, "Invalid token type");
+                return;
+            }
+
+            // 4. 토큰에서 사용자 ID 추출
             Long userId = jwtUtil.getUserIdFromToken(accessToken);
 
-            // 4. 요청 속성에 인증된 사용자 ID 저장
+            // 5. 요청 속성에 인증된 사용자 ID 저장
             request.setAttribute(AUTHENTICATED_USER_ID_ATTRIBUTE, userId);
 
-            // 5. 다음 필터로 진행
+            // 6. 다음 필터로 진행
             filterChain.doFilter(request, response);
 
         } catch (ExpiredTokenException e) {
