@@ -14,6 +14,7 @@ import lombok.NoArgsConstructor;
 public class PaymentCreateResponseDto {
     private Long paymentId;
     private Long orderId;
+    private String tossOrderId;
     private OrderType orderType;
     private Long amount;
     private PaymentStatus paymentStatus;

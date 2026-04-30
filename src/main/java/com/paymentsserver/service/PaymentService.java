@@ -63,6 +63,7 @@ public class PaymentService {
         return PaymentCreateResponseDto.builder()
                 .paymentId(saved.getPaymentId())
                 .orderId(saved.getOrderId())
+                .tossOrderId(saved.getTossOrderId())
                 .orderType(saved.getOrderType())
                 .amount(saved.getAmount())
                 .paymentStatus(saved.getPaymentStatus())
