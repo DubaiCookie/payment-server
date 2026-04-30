@@ -1,6 +1,7 @@
 package com.paymentsserver.controller;
 
 import com.paymentsserver.dto.RefundRequestDto;
+import com.paymentsserver.dto.RefundResponseDto;
 import com.paymentsserver.entity.Refund;
 import com.paymentsserver.service.RefundService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -25,19 +26,14 @@ public class RefundController {
 
     @PostMapping
     @Operation(summary = "환불 처리", description = "결제를 취소하고 환불을 처리합니다.")
-    public ResponseEntity<Refund> processRefund(@RequestBody RefundRequestDto request,
-                                                HttpServletRequest httpRequest) {
+    public ResponseEntity<RefundResponseDto> processRefund(@RequestBody RefundRequestDto request,
+                                                           HttpServletRequest httpRequest) {
         Long userId = (Long) httpRequest.getAttribute("authenticatedUserId");
         if (userId == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        try {
-            Refund refund = refundService.processRefund(request, userId);
-            return ResponseEntity.status(HttpStatus.CREATED).body(refund);
-        } catch (Exception e) {
-            log.error("Refund processing failed", e);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
-        }
+        RefundResponseDto response = refundService.processRefund(request, userId);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{refundId}")
