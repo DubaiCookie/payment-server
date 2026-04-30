@@ -26,6 +26,7 @@ public class FilterConfig {
 
         // 필터 적용 URL 패턴 (인증 필요)
         // 결제 관련 모든 API는 인증 필요
+        registrationBean.addUrlPatterns("/payments");
         registrationBean.addUrlPatterns("/payments/*");
         registrationBean.addUrlPatterns("/refunds/*");
 
