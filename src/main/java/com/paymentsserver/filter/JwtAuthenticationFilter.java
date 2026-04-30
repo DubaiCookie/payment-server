@@ -51,8 +51,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         try {
-            // 1. 쿠키에서 Access Token 추출
+            // 1. 쿠키 우선, 없으면 Authorization 헤더에서 추출 (Swagger 테스트용)
             String accessToken = extractTokenFromCookie(request);
+            if (accessToken == null) {
+                accessToken = extractTokenFromHeader(request);
+            }
 
             if (accessToken == null) {
                 sendUnauthorizedResponse(response, "Access token not found");
@@ -87,9 +90,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
     }
 
-    /**
-     * 쿠키에서 Access Token 추출
-     */
+    private String extractTokenFromHeader(HttpServletRequest request) {
+        String bearer = request.getHeader("Authorization");
+        if (bearer != null && bearer.startsWith("Bearer ")) {
+            return bearer.substring(7);
+        }
+        return null;
+    }
+
     private String extractTokenFromCookie(HttpServletRequest request) {
         Cookie[] cookies = request.getCookies();
         if (cookies == null) {
