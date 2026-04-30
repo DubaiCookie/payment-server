@@ -1,6 +1,6 @@
 package com.paymentsserver.entity;
 
 public enum TicketType {
-    GENERAL,
+    BASIC,
     PREMIUM
 }

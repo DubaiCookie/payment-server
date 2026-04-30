@@ -1,6 +1,8 @@
 package com.paymentsserver.entity;
 
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -8,6 +10,8 @@ import lombok.NoArgsConstructor;
 @Table(name = "tickets")
 @Getter
 @NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class Ticket {
 
     @Id
@@ -19,7 +23,7 @@ public class Ticket {
     @Column(name = "ticket_type", nullable = false)
     private TicketType ticketType;
 
-    @Column(name = "ticket_count", nullable = false)
+    @Column(name = "quantity", nullable = false)
     private Integer ticketCount;
 
     @Column(name = "price", nullable = false)
