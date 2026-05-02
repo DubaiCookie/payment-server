@@ -36,11 +36,18 @@ public class Order {
     @Column(name = "order_status", nullable = false)
     private OrderStatus orderStatus;
 
-    @Column(name = "ticket_quantity", nullable = false)
+    @Column(name = "ticket_quantity")
     private Integer ticketQuantity;
 
-    @Column(name = "ticket_management_id", nullable = false)
+    @Column(name = "ticket_management_id")
     private Long ticketManagementId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "order_type", nullable = false, length = 20)
+    private OrderType orderType;
+
+    @Column(name = "attraction_image_id")
+    private Long attractionImageId;
 
     @Column(name = "expired_at")
     private LocalDateTime expiredAt;

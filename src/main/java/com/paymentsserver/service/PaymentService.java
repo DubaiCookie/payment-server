@@ -5,6 +5,7 @@ import com.paymentsserver.dto.*;
 import com.paymentsserver.entity.*;
 import com.paymentsserver.exception.PaymentException;
 import com.paymentsserver.kafka.KafkaProducer;
+import com.paymentsserver.repository.OrderRepository;
 import com.paymentsserver.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +23,7 @@ import java.util.stream.Collectors;
 public class PaymentService {
 
     private final PaymentRepository paymentRepository;
+    private final OrderRepository orderRepository;
     private final TossPaymentClient tossPaymentClient;
     private final KafkaProducer kafkaProducer;
 
@@ -121,12 +123,20 @@ public class PaymentService {
 
             log.info("Payment confirmed: paymentId={}, orderId={}", existingPayment.getPaymentId(), confirmDto.getOrderId());
 
+            // Order를 조회하여 orderType 과 attractionImageId를 Kafka 이벤트에 포함
+            Order order = orderRepository.findById(existingPayment.getOrderId()).orElse(null);
+            String orderTypeStr = (order != null && order.getOrderType() != null)
+                    ? order.getOrderType().name() : null;
+            Long attractionImageId = (order != null) ? order.getAttractionImageId() : null;
+
             kafkaProducer.sendPaymentCompletedEvent(
                     existingPayment.getUserId(),
                     existingPayment.getPaymentId(),
                     existingPayment.getOrderId(),
                     existingPayment.getAmount(),
-                    null
+                    null,
+                    orderTypeStr,
+                    attractionImageId
             );
 
             return PaymentConfirmResponseDto.builder()

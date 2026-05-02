@@ -3,6 +3,7 @@ package com.paymentsserver.controller;
 import com.paymentsserver.dto.*;
 import com.paymentsserver.entity.Payment;
 import com.paymentsserver.service.PaymentService;
+import com.paymentsserver.service.PhotoPaymentService;
 import com.paymentsserver.service.RefundService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,6 +24,7 @@ import java.util.List;
 public class PaymentController {
 
     private final PaymentService paymentService;
+    private final PhotoPaymentService photoPaymentService;
     private final RefundService refundService;
 
     @PostMapping
@@ -35,6 +37,18 @@ public class PaymentController {
         }
         PaymentCreateResponseDto response = paymentService.createPayment(request, userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PostMapping("/photo")
+    @Operation(summary = "사진 결제 준비", description = "놀이기구 탑승 사진 구매를 위한 결제를 준비합니다.")
+    public ResponseEntity<PaymentCreateResponseDto> createPhotoPayment(
+            @RequestBody PhotoPaymentRequestDto request,
+            HttpServletRequest httpRequest) {
+        Long userId = (Long) httpRequest.getAttribute("authenticatedUserId");
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        return ResponseEntity.ok(photoPaymentService.createPhotoPayment(request, userId));
     }
 
     @PostMapping("/confirm")

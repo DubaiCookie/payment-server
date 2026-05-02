@@ -17,7 +17,8 @@ public class KafkaProducer {
     /**
      * 결제 완료 이벤트를 auth-server로 전송
      */
-    public void sendPaymentCompletedEvent(Long userId, Long paymentId, Long orderId, Long amount, Long ticketManagementId) {
+    public void sendPaymentCompletedEvent(Long userId, Long paymentId, Long orderId, Long amount,
+                                          Long ticketManagementId, String orderType, Long attractionImageId) {
         try {
             PaymentEventDto event = PaymentEventDto.builder()
                     .userId(userId)
@@ -26,6 +27,8 @@ public class KafkaProducer {
                     .amount(amount)
                     .ticketManagementId(ticketManagementId)
                     .eventType("PAYMENT_COMPLETED")
+                    .orderType(orderType)
+                    .attractionImageId(attractionImageId)
                     .build();
 
             String message = objectMapper.writeValueAsString(event);
