@@ -16,6 +16,7 @@ public class PaymentCreateResponseDto {
     private Long orderId;
     private String tossOrderId;
     private OrderType orderType;
+    private String orderName;
     private Long amount;
     private PaymentStatus paymentStatus;
 }

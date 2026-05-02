@@ -67,6 +67,7 @@ public class PaymentService {
                 .orderId(saved.getOrderId())
                 .tossOrderId(saved.getTossOrderId())
                 .orderType(saved.getOrderType())
+                .orderName(saved.getOrderName())
                 .amount(saved.getAmount())
                 .paymentStatus(saved.getPaymentStatus())
                 .build();
