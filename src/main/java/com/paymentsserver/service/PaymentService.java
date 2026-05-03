@@ -1,11 +1,12 @@
 package com.paymentsserver.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.paymentsserver.client.TossPaymentClient;
 import com.paymentsserver.dto.*;
 import com.paymentsserver.entity.*;
 import com.paymentsserver.exception.PaymentException;
-import com.paymentsserver.kafka.KafkaProducer;
 import com.paymentsserver.repository.OrderRepository;
+import com.paymentsserver.repository.OutboxEventRepository;
 import com.paymentsserver.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -24,8 +26,9 @@ public class PaymentService {
 
     private final PaymentRepository paymentRepository;
     private final OrderRepository orderRepository;
+    private final OutboxEventRepository outboxEventRepository;
     private final TossPaymentClient tossPaymentClient;
-    private final KafkaProducer kafkaProducer;
+    private final ObjectMapper objectMapper;
 
     @Transactional
     public PaymentCreateResponseDto createPayment(PaymentRequestDto request, Long userId) {
@@ -124,21 +127,9 @@ public class PaymentService {
 
             log.info("Payment confirmed: paymentId={}, orderId={}", existingPayment.getPaymentId(), confirmDto.getOrderId());
 
-            // Order를 조회하여 orderType 과 attractionImageId를 Kafka 이벤트에 포함
+            // Order 조회 후 outbox 이벤트 저장 (같은 트랜잭션 → 원자성 보장)
             Order order = orderRepository.findById(existingPayment.getOrderId()).orElse(null);
-            String orderTypeStr = (order != null && order.getOrderType() != null)
-                    ? order.getOrderType().name() : null;
-            Long attractionImageId = (order != null) ? order.getAttractionImageId() : null;
-
-            kafkaProducer.sendPaymentCompletedEvent(
-                    existingPayment.getUserId(),
-                    existingPayment.getPaymentId(),
-                    existingPayment.getOrderId(),
-                    existingPayment.getAmount(),
-                    null,
-                    orderTypeStr,
-                    attractionImageId
-            );
+            saveOutboxEvent(existingPayment, order);
 
             return PaymentConfirmResponseDto.builder()
                     .paymentId(existingPayment.getPaymentId())
@@ -185,5 +176,36 @@ public class PaymentService {
                         .paidAt(p.getPaidAt())
                         .build())
                 .collect(Collectors.toList());
+    }
+
+    private void saveOutboxEvent(Payment payment, Order order) {
+        try {
+            Map<String, Object> payload = Map.of(
+                    "eventType", "PAYMENT_COMPLETED",
+                    "orderType", order != null && order.getOrderType() != null ? order.getOrderType().name() : "UNKNOWN",
+                    "userId", payment.getUserId(),
+                    "paymentId", payment.getPaymentId(),
+                    "orderId", payment.getOrderId(),
+                    "amount", payment.getAmount(),
+                    "ticketManagementId", order != null && order.getTicketManagementId() != null ? order.getTicketManagementId() : 0L,
+                    "ticketQuantity", order != null && order.getTicketQuantity() != null ? order.getTicketQuantity() : 0,
+                    "attractionImageId", order != null && order.getAttractionImageId() != null ? order.getAttractionImageId() : 0L
+            );
+
+            OutboxEvent outboxEvent = OutboxEvent.builder()
+                    .aggregateType("Payment")
+                    .aggregateId(payment.getPaymentId())
+                    .eventType("PAYMENT_COMPLETED")
+                    .payload(objectMapper.writeValueAsString(payload))
+                    .status(OutboxStatus.PENDING)
+                    .build();
+
+            outboxEventRepository.save(outboxEvent);
+            log.info("Outbox event saved: paymentId={}, orderType={}", payment.getPaymentId(),
+                    order != null ? order.getOrderType() : "UNKNOWN");
+        } catch (Exception e) {
+            log.error("Failed to save outbox event for paymentId={}", payment.getPaymentId(), e);
+            throw new PaymentException("OUTBOX_SAVE_FAILED", "이벤트 저장에 실패했습니다.");
+        }
     }
 }
