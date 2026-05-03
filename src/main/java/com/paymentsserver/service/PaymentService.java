@@ -181,17 +181,15 @@ public class PaymentService {
 
     private void saveOutboxEvent(Payment payment, Order order) {
         try {
-            Map<String, Object> payload = Map.of(
-                    "eventType", "PAYMENT_COMPLETED",
-                    "orderType", order != null && order.getOrderType() != null ? order.getOrderType().name() : "UNKNOWN",
-                    "userId", payment.getUserId(),
-                    "paymentId", payment.getPaymentId(),
-                    "orderId", payment.getOrderId(),
-                    "amount", payment.getAmount(),
-                    "ticketManagementId", order != null && order.getTicketManagementId() != null ? order.getTicketManagementId() : 0L,
-                    "ticketQuantity", order != null && order.getTicketQuantity() != null ? order.getTicketQuantity() : 0,
-                    "attractionImageId", order != null && order.getAttractionImageId() != null ? order.getAttractionImageId() : 0L
-            );
+            Map<String, Object> payload = new java.util.HashMap<>();
+            payload.put("eventType", "PAYMENT_COMPLETED");
+            payload.put("orderType", payment.getOrderType().name());
+            payload.put("userId", payment.getUserId());
+            payload.put("paymentId", payment.getPaymentId());
+            payload.put("orderId", payment.getOrderId());
+            payload.put("amount", payment.getAmount());
+            // PHOTO 주문만 payment-db orders 테이블에 존재; TICKET은 ticket-server DB에서 조회
+            payload.put("attractionImageId", order != null && order.getAttractionImageId() != null ? order.getAttractionImageId() : 0L);
 
             OutboxEvent outboxEvent = OutboxEvent.builder()
                     .aggregateType("Payment")
@@ -202,8 +200,7 @@ public class PaymentService {
                     .build();
 
             outboxEventRepository.save(outboxEvent);
-            log.info("Outbox event saved: paymentId={}, orderType={}", payment.getPaymentId(),
-                    order != null ? order.getOrderType() : "UNKNOWN");
+            log.info("Outbox event saved: paymentId={}, orderType={}", payment.getPaymentId(), payment.getOrderType());
         } catch (Exception e) {
             log.error("Failed to save outbox event for paymentId={}", payment.getPaymentId(), e);
             throw new PaymentException("OUTBOX_SAVE_FAILED", "이벤트 저장에 실패했습니다.");
